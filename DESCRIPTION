@@ -19,3 +19,5 @@ Imports:
     dplyr,
     shiny,
     shinythemes
+URL: https://github.com/softloud/hppapp
+BugReports: https://github.com/softloud/hppapp/issues
