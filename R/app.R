@@ -10,85 +10,131 @@
 hpp_app <- function(...) {
     # ui ----------------------------------------------------------------------
     
-    ui <- shiny::fluidPage(
-        # shinythemes::themeSelector(),  # try out different themes
-        theme = shinythemes::shinytheme("sandstone"),
-        # set theme
+    ui <- shinydashboard::dashboardPage(
+        skin = "blue",
         
-        # Application title
-        shiny::titlePanel("Treating chronic pain with antidepressants"),
+        # ui header ---------------------------------------------------------------
         
-        # Sidebar with a slider input for number of bins
-        shiny::sidebarLayout(
-            shiny::sidebarPanel(
-                width = 4,
-                shiny::inputPanel(
-                    shiny::selectInput(
-                        inputId = "outcome",
-                        label = "Outcome",
-                        selected = "pain_int",
-                        choices = hpp_outcomes
-                    )),
-                
-                shiny::inputPanel(
-                    shiny::h5("Subgroups"),
-                    shinydashboard::box(
-                        title = "Class of Antidepressant",
-                        collapsible = TRUE,
-                        collapsed = TRUE,
-                    shiny::checkboxGroupInput(
-                        inputId = "class",
-                        label = "Class of Antidepressant",
-                        choices = hpp_obs %>% dplyr::pull(class) %>% unique()
-                    ))
+        
+        shinydashboard::dashboardHeader(title = "Treating chronic pain with antidepressants",
+                                        # puts sidebar toggle on right
+                                        titleWidth = "calc(100% - 44px)"),
+        
+        # ui sidebar --------------------------------------------------------------
+        shinydashboard::dashboardSidebar(
+            width = 200,
+            shinydashboard::sidebarMenu(
+                id = "tabs",
+                shinydashboard::menuItem(
+                    "Direct evidence",
+                    tabName = "net",
+                    icon = shiny::icon("project-diagram")
                 ),
-                
-                shiny::inputPanel(
-                    shiny::selectInput(
-                        inputId = "timepoint",
-                        label = "Timepoint",
-                        selected = "post_int",
-                        choices = hpp_obs %>% dplyr::pull(timepoint) %>% 
-                            unique()
-                    )
+                shinydashboard::menuItem(
+                    "Summary information",
+                    tabName = "summary",
+                    icon = shiny::icon("table")
+                ),
+                shinydashboard::menuItem(
+                    "Network meta-analysis",
+                    tabName = "nma",
+                    icon = shiny::icon("calculator")
+                ),
+                shinydashboard::menuItem(
+                    "Observation-level data",
+                    tabName = "data",
+                    icon = shiny::icon("file-csv")
                 )
             ),
+            shiny::selectInput(
+                inputId = "outcome",
+                label = "Outcome",
+                selected = "pain_int",
+                choices = hpp_outcomes
+            ),
+            shinydashboard::box(
+                title = "Class of antidepressant",
+                collapsible = TRUE,
+                collapsed = TRUE,
+                width = 12,
+                background = "black",
+                shiny::checkboxGroupInput(
+                    inputId = "class",
+                    label = NULL,
+                    choices = hpp_obs %>% 
+                        dplyr::filter(!is.na(class)) %>% 
+                        dplyr::pull(class) %>% 
+                        unique(),
+                    selected = hpp_obs %>% 
+                        dplyr::filter(!is.na(class)) %>% 
+                        dplyr::pull(class) %>% 
+                        unique()
+                )
+            ),
+            shinydashboard::box(
+                title = "Studies",
+                collapsible = TRUE,
+                collapsed = TRUE,
+                width = 12,
+                background = "black",
+                shiny::checkboxGroupInput(
+                    inputId = "studies",
+                    label = NULL,
+                    choices = hpp_obs %>% 
+                        dplyr::pull(study) %>%
+                        unique(),
+                    selected = hpp_obs %>% 
+                        dplyr::pull(study) %>%
+                        unique()
+                )
+            ),
+            shiny::selectInput(
+                inputId = "timepoint",
+                label = "Timepoint",
+                choices = hpp_obs %>% dplyr::pull(timepoint) %>% unique(),
+                selected = "post_int"
+            )
             
-            # Show a plot of the generated distribution
-            shiny::mainPanel(
-                shiny::tabsetPanel(
-                    shiny::tabPanel("Selection summary",
-                                    shiny::tableOutput("ss")),
+        ),
+        # ui body -----------------------------------------------------------------
+        
+        
+        shinydashboard::dashboardBody(
+            shinyjs::useShinyjs(),
+            shinydashboard::tabItems(
+                shinydashboard::tabItem(
+                    tabName = "net",
+                    shiny::plotOutput("net",
+                                      height = 800,
+                                      width = 1500)
                     
-                    shiny::tabPanel(
-                        "Network meta-analysis",
-                        shiny::fluidRow(
-                            shiny::column(
-                                7,
-                                align = "center",
-                                shiny::plotOutput("net",
-                                                  height = 650,
-                                                  width = 650),
-                                shiny::plotOutput("tau",
-                                                  height = 200,
-                                                  width = 400)
-                            ),
-                            shiny::column(5,
-                                          shiny::plotOutput(
-                                              "forest",
-                                              height = 850,
-                                              width = 400
-                                          ))
-                        )
+                ),
+                
+                shinydashboard::tabItem(
+                    tabName = "nma",
+                    shiny::column(
+                        7,
+                        align = "center",
+                        shiny::plotOutput("tau",
+                                          height = 200,
+                                          width = 700)
                     ),
-                    
-                    shiny::tabPanel("Data",
-                                    shiny::tableOutput("obs"))
-                    
-                )# end tabset panel
-            )# end main panel)# end sidebar layout
-        )# end fluidpage
-    ) # end ui
+                    shiny::column(5,
+                                  shiny::plotOutput(
+                                      "forest",
+                                      height = 850,
+                                      width = 600
+                                  ))
+                ),
+                
+                shinydashboard::tabItem(tabName = "summary",
+                                        gt::gt_output("ss")),
+                
+                shinydashboard::tabItem(tabName = "data",
+                                        shiny::h3("Hello, world."))
+            )
+        )
+    )
     
     
     # server ------------------------------------------------------------------
@@ -98,6 +144,7 @@ hpp_app <- function(...) {
         obs <- reactive({
             obs_selected(
                 outcome_selected = input$outcome,
+                class_selected = input$class,
                 timepoint_selected = input$timepoint
             )
         })
@@ -114,12 +161,18 @@ hpp_app <- function(...) {
         output$ss <- gt::render_gt({
             ss_tab(obs())
         })
-        
-        # nma results -------------------------------------------------------------
-        
+
+
+# nma ---------------------------------------------------------------------
+
+nma_net <- reactive({
+    set_net(dat = obs(), mod_type = m_type())
+})                
+
+# nma plots ---------------------------------------------------------------
+
         output$net <- shiny::renderPlot({
-            m_pain_int$network %>%
-                net_plot()
+            net_plot(nma_net())
         })
         
         output$forest <- shiny::renderPlot({
@@ -133,18 +186,18 @@ hpp_app <- function(...) {
                 tau()
         })
         
-
-# data --------------------------------------------------------------------
-
+        
+        # data --------------------------------------------------------------------
+        
         output$obs <- gt::render_gt({
             obs_tab(obs(), m_type())
         })
         
     }
     
-
-# run app -----------------------------------------------------------------
-
+    
+    # run app -----------------------------------------------------------------
+    
     
     shiny::shinyApp(ui, server, ...)
 }
