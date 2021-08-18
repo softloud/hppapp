@@ -1,8 +1,10 @@
-obs <- readr::read_rds("obs.rds")
-
 test_that("viable obs", {
-  expect_success(viable_observations(
-    obs %>% 
-      filter(outcome == "pain_int")
-  ))
+  expect_true(
+    "data.frame" %in% (
+    viable_observations(
+    hpp_obs %>% 
+      dplyr::filter(outcome == "pain_int")
+  ) %>% class())
+  
+  )
 })

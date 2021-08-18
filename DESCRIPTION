@@ -17,7 +17,10 @@ RoxygenNote: 7.1.1
 Config/testthat/edition: 3
 Imports: 
     dplyr,
+    magrittr,
     shiny,
     shinythemes
 URL: https://github.com/softloud/hppapp
 BugReports: https://github.com/softloud/hppapp/issues
+Depends: 
+    R (>= 2.10)
