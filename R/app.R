@@ -52,6 +52,27 @@ hpp_app <- function(...) {
                 selected = "pain_int",
                 choices = hpp_outcomes
             ),
+            # shiny::uiOutput("condition_ui"),
+            shinydashboard::box(
+                title = "Condition",
+                collapsible = TRUE,
+                collapsed = TRUE,
+                width = 12,
+                background = "black",
+                shiny::checkboxGroupInput(
+                    inputId = "condition",
+                    label = NULL,
+                    choices = hpp_obs %>%
+                        dplyr::arrange(condition) %>%
+                        dplyr::filter(!is.na(condition)) %>%
+                        dplyr::pull(condition) %>%
+                        unique(),
+                    selected = hpp_obs %>%
+                        dplyr::filter(!is.na(condition)) %>%
+                        dplyr::pull(condition) %>%
+                        unique()
+                )
+            ),
             shinydashboard::box(
                 title = "Class of antidepressant",
                 collapsible = TRUE,
@@ -61,13 +82,13 @@ hpp_app <- function(...) {
                 shiny::checkboxGroupInput(
                     inputId = "class",
                     label = NULL,
-                    choices = hpp_obs %>% 
-                        dplyr::filter(!is.na(class)) %>% 
-                        dplyr::pull(class) %>% 
+                    choices = hpp_obs %>%
+                        dplyr::filter(!is.na(class)) %>%
+                        dplyr::pull(class) %>%
                         unique(),
-                    selected = hpp_obs %>% 
-                        dplyr::filter(!is.na(class)) %>% 
-                        dplyr::pull(class) %>% 
+                    selected = hpp_obs %>%
+                        dplyr::filter(!is.na(class)) %>%
+                        dplyr::pull(class) %>%
                         unique()
                 )
             ),
@@ -80,10 +101,11 @@ hpp_app <- function(...) {
                 shiny::checkboxGroupInput(
                     inputId = "studies",
                     label = NULL,
-                    choices = hpp_obs %>% 
+                    choices = hpp_obs %>%
+                        dplyr::arrange(study) %>%
                         dplyr::pull(study) %>%
                         unique(),
-                    selected = hpp_obs %>% 
+                    selected = hpp_obs %>%
                         dplyr::pull(study) %>%
                         unique()
                 )
@@ -112,26 +134,35 @@ hpp_app <- function(...) {
                 
                 shinydashboard::tabItem(
                     tabName = "nma",
-                    shiny::column(
-                        7,
-                        align = "center",
-                        shiny::plotOutput("tau",
-                                          height = 200,
-                                          width = 700)
-                    ),
-                    shiny::column(5,
+                    shiny::column(8,
                                   shiny::plotOutput(
                                       "forest",
                                       height = 850,
                                       width = 600
+                                  )),
+                    shiny::column(4,
+                                  align = "center",
+                                  shiny::actionButton(
+                                      inputId = "run_nma",
+                                      label = "Update model",
+                                      icon = shiny::icon("calculator")
+                                  ),
+                                  shiny::plotOutput(
+                                      "tau",
+                                      height = 200,
+                                      width = 400
                                   ))
                 ),
                 
                 shinydashboard::tabItem(tabName = "summary",
                                         gt::gt_output("ss")),
                 
-                shinydashboard::tabItem(tabName = "data",
-                                        shiny::h3("Hello, world."))
+                shinydashboard::tabItem(
+                    tabName = "data",
+                    shiny::downloadButton(outputId = "obs_dat",
+                                          "Download observation-level data"),
+                    gt::gt_output("obs")
+                )
             )
         )
     )
@@ -144,7 +175,9 @@ hpp_app <- function(...) {
         obs <- reactive({
             obs_selected(
                 outcome_selected = input$outcome,
+                condition_selected = input$condition,
                 class_selected = input$class,
+                study_selected = input$studies,
                 timepoint_selected = input$timepoint
             )
         })
@@ -156,34 +189,82 @@ hpp_app <- function(...) {
         })
         
         
+        # reactive ui -------------------------------------------------------------
+        
+        # observe({
+        #     class_updated <- obs() %>%
+        #         dplyr::arrange(class) %>%
+        #         dplyr::pull(class) %>%
+        #         unique()
+        #
+        #
+        #     updateCheckboxGroupInput(
+        #         inputId = "class",
+        #         choices = class_updated
+        #     )
+        # })
+        #
+        # output$condition_ui <-
+        #     shiny::renderUI({
+        #         selections <-
+        #             obs() %>%
+        #             dplyr::arrange(condition) %>%
+        #             dplyr::pull(condition) %>%
+        #             unique()
+        #
+        #         shiny::checkboxGroupInput(
+        #             inputId = "condition",
+        #             label = "Condition",
+        #             choices = selections,
+        #             selected = selections
+        #         )
+        #     })
+        #
+        
         # summary information -----------------------------------------------------
         
         output$ss <- gt::render_gt({
             ss_tab(obs())
         })
-
-
-# nma ---------------------------------------------------------------------
-
-nma_net <- reactive({
-    set_net(dat = obs(), mod_type = m_type())
-})                
-
-# nma plots ---------------------------------------------------------------
-
+        
+        
+        # nma ---------------------------------------------------------------------
+        
+        nma_net <-  reactive({
+            set_net(dat = obs(), mod_type = m_type())
+        })
+        
+        nma_mod <- observeEvent(input$run_nma, {
+            multinma::nma(
+                nma_net(),
+                trt_effects = "random"
+            )
+        })
+        
+        nma_forest <- reactive({
+            forest_plot(hpp_mod = nma_mod(),
+                        mod_type = m_type())
+            
+        })
+        
+        nma_tau <- reactive({
+            nma_mod() %>%
+                tau()
+            
+        })
+        
+        # nma plots ---------------------------------------------------------------
+        
         output$net <- shiny::renderPlot({
             net_plot(nma_net())
         })
         
         output$forest <- shiny::renderPlot({
-            m_pain_int %>%
-                forest_plot(hpp_mod = .,
-                            mod_type = m_type())
+            nma_forest()
         })
         
         output$tau <- shiny::renderPlot({
-            m_pain_int %>%
-                tau()
+            nma_tau()
         })
         
         
@@ -192,6 +273,16 @@ nma_net <- reactive({
         output$obs <- gt::render_gt({
             obs_tab(obs(), m_type())
         })
+        
+        output$obs_dat <- shiny::downloadHandler(
+            filename = function() {
+                glue::glue("observations-{lubridate::now()}.csv")
+            },
+            content = function(file) {
+                readr::write_csv(obs(),
+                                 file)
+            }
+        )
         
     }
     

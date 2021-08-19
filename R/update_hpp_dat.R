@@ -8,7 +8,7 @@ update_hpp_dat <- function() {
   hpp_obs <-
     withr::with_dir("../happypillpain", targets::tar_read(w_obs)) %>% 
     dplyr::filter(stringr::str_detect(design, "parallel"),
-                  stringr::str_detect(type, "antidepressant|placebo"))
+                  stringr::str_detect(type %in% c("antidepressant", "placebo")))
   
     usethis::use_data(hpp_obs, overwrite = TRUE)
     

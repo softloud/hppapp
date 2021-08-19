@@ -4,10 +4,19 @@
 \alias{obs_selected}
 \title{Update dataset}
 \usage{
-obs_selected(outcome_selected = "pain_int", timepoint_selected = "post_int")
+obs_selected(
+  outcome_selected = "pain_int",
+  class_selected,
+  study_selected,
+  timepoint_selected = "post_int"
+)
 }
 \arguments{
 \item{outcome_selected}{User-input outcome, defaults to \code{pain_int}.}
+
+\item{class_selected}{User-selected classes.}
+
+\item{study_selected}{User-selected studies.}
 
 \item{timepoint_selected}{User-input timepoint, defaults to \code{post_int}.
 

@@ -9,7 +9,8 @@ obs_tab <- function(obs, mod_type) {
   reported_var <-
     obs %>%
     dplyr::select(study, intervention,
-                  condition = condition_general,
+                  condition,
+                  class,
                   mean, sd, r, n, scale)
   
   output_tab <-
