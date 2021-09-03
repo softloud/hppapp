@@ -248,8 +248,8 @@ hpp_app <- function(...) {
         })
         
         nma_tau <- reactive({
-            nma_mod() %>%
-                tau()
+            # nma_mod() %>%
+                tau(m_pain_int)
             
         })
         
@@ -260,7 +260,9 @@ hpp_app <- function(...) {
         })
         
         output$forest <- shiny::renderPlot({
-            nma_forest()
+            # nma_forest()
+            multinma::relative_effects(m_pain_int) %>% 
+                plot()
         })
         
         output$tau <- shiny::renderPlot({
